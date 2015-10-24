@@ -1,49 +1,88 @@
 #include <pthread.h>
 #include <stdio.h>
-#define number_of_threads 5
+#include <stdlib.h>
 
-void* printHelloWorld ( void* threadID ) {
+struct readThreadParams {
+	pthread_t	readThread ;
+	char 		data[256] ;
+	int 		lineNum ;
+	FILE* 		readFile ;
+	FILE*		writeFile ;
+};
 
-    long tid ;
-    int i ; 
-    
-    tid     = (long) threadID ;
-    for ( i = 0 ; i < 20 ; i ++ ) {
-        sleep ( 1 ) ;
-        printf ( " Hello World ! pthread ID is %ld \n" , tid ) ;
-    }
-    
-    pthread_exit ( NULL ) ;
+void *bufferRead ( void* context ) {
 
-} 
+	printf ( "buffer Read entered.\n" ) ;
 
-void* printHelloWorld2 ( void* threadID ) {
+	struct readThreadParams *readParams = context ;
+	int lineCount 		= 0 ;
+	// jump the specific line
+	for ( lineCount = 0 ; lineCount < readParams->lineNum ; lineCount ++ ) 
+		fgets( readParams->data , sizeof(readParams->data), readParams->readFile ) ;
 
-    long tid ;
-    int i ;
-    
-    tid     = (long) threadID ;
-    for ( i = 0 ; i < 20 ; i ++ ) {
-        sleep ( 1 ) ;
-        printf ( " Suck my balls, world ! pthread ID is %ld \n" , tid ) ;
-    }
-    
-    pthread_exit ( NULL ) ;
+	printf ( "jump reached.\n " ) ;
 
-} 
+	// read line
+	fgets( readParams->data , sizeof(readParams->data), readParams->readFile ) ;
 
+	printf ( "read line.\n" ) ;
+
+	// display line
+	printf ( "%s\n" , readParams->data ) ;
+	// write line
+	fprintf ( readParams->writeFile, readParams->data ) ;
+	// exit
+	pthread_exit ( NULL ) ;
+}
 
 int main ( int argc, char* argv[] ) {
 
-    pthread_t threads[number_of_threads] ;
+	char const* const readFileName 		= argv[1]; 
+	char const* const writeFileName 	= argv[2]; 
 
-    int rc ;
-    long t = 0 ;
+    FILE* readFile[10] ; 
+    FILE* writeFile[10]; 
+	
+	int i = 0 ;
+	for ( i = 0 ; i < 10 ; i ++ ) {
+		readFile[i] 		= fopen(readFileName, "r") ;
+		writeFile[i] 		= fopen(writeFileName, "a") ;
+	}
 
-    rc = pthread_create ( &threads[1] , NULL , printHelloWorld , (void *) 1 ) ;
-    rc = pthread_create ( &threads[2] , NULL , printHelloWorld2 , (void *) 2 ) ;
+	// This is sequential reading 
+	// char line[256];
+    // while (fgets(line, sizeof(line), readFile)) {
+    //     printf("%s", line); 
+	// 	fprintf ( writeFile, line ) ;
+    // }
+	  
+	// This is parelell reading and writing	
+	long threadNum = 0 ;
+	int threadCreated ;	
+	
+	struct readThreadParams threadParams[10] ; 
+	for ( threadNum = 0 ; threadNum < 10 ; threadNum ++ ) {
+		threadParams[threadNum].lineNum 	= threadNum ;
+		threadParams[threadNum].readFile 	= readFile[threadNum] ;
+		threadParams[threadNum].writeFile 	= writeFile[threadNum] ;
+	}
 
-    
-    pthread_exit ( NULL ) ; 
+	for ( threadNum = 0 ; threadNum < 10 ; threadNum ++ ) {
+		printf ( " %lu threads segmentfault.\n", threadNum ) ;
+		threadCreated = pthread_create ( &threadParams[threadNum].readThread, 
+							NULL, bufferRead, &threadParams[threadNum] ) ;
+		if ( threadCreated < 0 ) {
+			printf ( " %lu threads failed to be created.\n", threadNum ) ;
+		}
+	}
+	pthread_exit ( NULL ) ;
+
+	for ( i = 0 ; i < 10 ; i ++ ) {
+		fclose(readFile[i]);
+		fclose(writeFile[i]);
+	}
+
+    return 0;
 
 }
+

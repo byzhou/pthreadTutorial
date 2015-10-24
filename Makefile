@@ -2,10 +2,13 @@ FLAGS       := -g -Wall -O3
 
 APPS        := helloworld
 
-all: $(APPS)
+all: run
 
 %: %.c
-    gcc $(FLAGS) -pthread $@.c -o $@
+	~/colorgcc $(FLAGS) -pthread $@.c -o $@
+
+run: $(APPS)
+	./helloworld read.txt write.txt
 
 clean:
 	rm -rf *.o $(APPS)
